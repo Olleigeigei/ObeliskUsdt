@@ -1,5 +1,6 @@
 # ObeliskUSDT
 
+[![npm version](https://img.shields.io/npm/v/%40obeliskstudio%2Fobelisk-usdt?style=for-the-badge&logo=npm&logoColor=white)](https://www.npmjs.com/package/@obeliskstudio/obelisk-usdt)
 [![Business Contact](https://img.shields.io/badge/Business-Telegram%20%40Mhuai8-26A5E4?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/mhuai8)
 [![Studio Channel](https://img.shields.io/badge/Studio-Telegram%20%40ObeliskStudio-1D9BF0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/ObeliskStudio)
 
@@ -77,20 +78,23 @@
 npm i @obeliskstudio/obelisk-usdt
 ```
 
-### clone 后本地使用
+### 在线使用（生产推荐）
+
+你可以直接在宿主项目通过 npm 在线拉取并使用，不需要 clone 本仓库：
 
 ```bash
-git clone https://github.com/Olleigeigei/ObeliskUsdt.git
-cd ObeliskUsdt
-npm i
-npm run build
+npm i @obeliskstudio/obelisk-usdt@latest
 ```
 
-在宿主项目中使用本地包：
+安装后可用以下命令确认版本：
 
 ```bash
-npm i ../ObeliskUsdt
+npm ls @obeliskstudio/obelisk-usdt
 ```
+
+包地址：
+
+- `https://www.npmjs.com/package/@obeliskstudio/obelisk-usdt`
 
 ## 5 分钟接入清单
 
