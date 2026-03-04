@@ -4,10 +4,10 @@
  * @author Telegram @Mhuai8
  */
 
-import axios from 'axios';
 import Decimal from 'decimal.js';
 import TronWebModule from 'tronweb';
 import { Op } from 'sequelize';
+import axios from 'axios';
 import PaymentOrder from '../models/PaymentOrder';
 import PaymentWallet from '../models/PaymentWallet';
 import PaymentTransaction from '../models/PaymentTransaction';
@@ -23,6 +23,17 @@ interface TronscanTransferItem {
   hash?: string;
   block?: number;
   contract_ret?: string;
+}
+
+interface TronGridTransferItem {
+  transaction_id?: string;
+  token_info?: {
+    address?: string;
+  };
+  block_timestamp?: number;
+  from?: string;
+  to?: string;
+  value?: string;
 }
 
 export function createBlockScannerService(deps: ObeliskUSDTDeps, configService: any, orderService?: any) {
@@ -54,6 +65,7 @@ export function createBlockScannerService(deps: ObeliskUSDTDeps, configService: 
     blockTimestamp: number;
   }>> {
     const baseUrl = await configService.getTronscanApiUrl();
+    const tronGridBaseUrl = await configService.getTronGridApiUrl();
     const trc20Id = await configService.getUSDTContractAddress();
     const timeWindowMs = await configService.getScanTimeWindowMs();
     const limit = await configService.getScanTrc20Limit();
@@ -66,26 +78,6 @@ export function createBlockScannerService(deps: ObeliskUSDTDeps, configService: 
       headers['TRON-PRO-API-KEY'] = tronscanApiKey;
     }
 
-    const res = await axios.get<{ data?: TronscanTransferItem[] }>(
-      `${baseUrl.replace(/\/$/, '')}/api/transfer/trc20`,
-      {
-        params: {
-          address,
-          start_timestamp: start,
-          end_timestamp: now,
-          limit,
-          trc20Id,
-          direction: 2,
-          sort: '-timestamp',
-          start: 0,
-          db_version: 1,
-        },
-        headers,
-        timeout: 15_000,
-      },
-    );
-
-    const list = res.data?.data || [];
     const normalized: Array<{
       txHash: string;
       fromAddress: string;
@@ -95,6 +87,77 @@ export function createBlockScannerService(deps: ObeliskUSDTDeps, configService: 
       blockNumber: number;
       blockTimestamp: number;
     }> = [];
+
+    // 先走 TronGrid，稳定性更高。
+    try {
+      const gridRes = await axios.get<{ data?: TronGridTransferItem[] }>(
+        `${tronGridBaseUrl.replace(/\/$/, '')}/v1/accounts/${encodeURIComponent(address)}/transactions/trc20`,
+        {
+          params: {
+            limit,
+            only_confirmed: true,
+            only_to: true,
+            min_timestamp: start,
+            max_timestamp: now,
+          },
+          headers,
+          timeout: 15_000,
+        },
+      );
+      const gridList = gridRes.data?.data || [];
+      for (const item of gridList) {
+        if (!item.transaction_id || !item.value || !item.to) continue;
+        if (String(item.to).toLowerCase() !== address.toLowerCase()) continue;
+        if (String(item.token_info?.address || '').toLowerCase() !== trc20Id.toLowerCase()) continue;
+        normalized.push({
+          txHash: String(item.transaction_id),
+          fromAddress: String(item.from || ''),
+          toAddress: String(item.to),
+          amountSun: String(item.value),
+          amountUsdt: convertSunToUSDTString(String(item.value)),
+          // TronGrid 该接口未返回 block_number，后续在匹配时补拉。
+          blockNumber: 0,
+          blockTimestamp: Number(item.block_timestamp || 0),
+        });
+      }
+    } catch (error) {
+      deps.logger.warn('[ObeliskUSDT] TronGrid 查询失败，回退 Tronscan', { address, error });
+    }
+
+    if (normalized.length > 0) {
+      return normalized;
+    }
+
+    const endpoint = `${baseUrl.replace(/\/$/, '')}/api/transfer/trc20`;
+    const commonParams = {
+      address,
+      limit,
+      trc20Id,
+      direction: 2,
+      sort: '-timestamp',
+      start: 0,
+      db_version: 1,
+    };
+
+    const firstRes = await axios.get<{ data?: TronscanTransferItem[] }>(endpoint, {
+      params: {
+        ...commonParams,
+        start_timestamp: start,
+        end_timestamp: now,
+      },
+      headers,
+      timeout: 15_000,
+    });
+
+    let list = firstRes.data?.data || [];
+    if (list.length === 0) {
+      const fallbackRes = await axios.get<{ data?: TronscanTransferItem[] }>(endpoint, {
+        params: commonParams,
+        headers,
+        timeout: 15_000,
+      });
+      list = fallbackRes.data?.data || [];
+    }
 
     for (const item of list) {
       if (item.contract_ret !== 'SUCCESS') continue;
@@ -147,6 +210,20 @@ export function createBlockScannerService(deps: ObeliskUSDTDeps, configService: 
     blockNumber: number;
     blockTimestamp: number;
   }): Promise<void> {
+    let resolvedBlockNumber = Number(transfer.blockNumber || 0);
+    if (resolvedBlockNumber <= 0 && transfer.txHash) {
+      try {
+        await ensureTronWeb();
+        const txInfo = await tronWeb.trx.getTransactionInfo(transfer.txHash);
+        resolvedBlockNumber = Number(txInfo?.blockNumber || 0);
+      } catch (error) {
+        deps.logger.warn('[ObeliskUSDT] 获取交易区块高度失败', {
+          txHash: transfer.txHash,
+          error,
+        });
+      }
+    }
+
     const [txRecord] = await PaymentTransaction.findOrCreate({
       where: { txHash: transfer.txHash },
       defaults: {
@@ -155,7 +232,7 @@ export function createBlockScannerService(deps: ObeliskUSDTDeps, configService: 
         toAddress: transfer.toAddress,
         amount: transfer.amountSun,
         amountInUSDT: transfer.amountUsdt,
-        blockNumber: transfer.blockNumber,
+        blockNumber: resolvedBlockNumber,
         blockTimestamp: transfer.blockTimestamp,
         isMatched: false,
       } as any,
@@ -178,7 +255,7 @@ export function createBlockScannerService(deps: ObeliskUSDTDeps, configService: 
       {
         status: 'paid',
         txHash: transfer.txHash,
-        blockNumber: transfer.blockNumber,
+        blockNumber: resolvedBlockNumber > 0 ? resolvedBlockNumber : null,
         paidAt: new Date(),
       },
       { where: { id: order.id, status: 'pending' } },
