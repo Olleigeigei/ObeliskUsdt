@@ -95,6 +95,7 @@ class PaymentOrder
             { name: 'idx_biz_order_no', fields: ['biz_order_no'] },
             { fields: ['status'] },
             { fields: ['wallet_address', 'actual_amount'] },
+            { name: 'idx_match_lookup', fields: ['status', 'wallet_address', 'actual_amount', 'expires_at'] },
             { fields: ['tx_hash'] },
             { fields: ['expires_at'] },
             { fields: ['created_at'] },

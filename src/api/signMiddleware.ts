@@ -36,6 +36,22 @@ function hmacSha256Hex(secret: string, content: string): string {
   return crypto.createHmac('sha256', secret).update(content).digest('hex');
 }
 
+function isSafeEqualHex(left: string, right: string): boolean {
+  const a = String(left || '').trim().toLowerCase();
+  const b = String(right || '').trim().toLowerCase();
+  if (!a || !b) return false;
+  if (!/^[a-f0-9]+$/.test(a) || !/^[a-f0-9]+$/.test(b)) return false;
+  if (a.length !== b.length) return false;
+  try {
+    const ab = Buffer.from(a, 'hex');
+    const bb = Buffer.from(b, 'hex');
+    if (ab.length !== bb.length || ab.length === 0) return false;
+    return crypto.timingSafeEqual(ab, bb);
+  } catch {
+    return false;
+  }
+}
+
 function getSignatureFromRequest(req: any): string {
   const headerSigRaw = (req.headers?.['x-obl-signature'] || req.headers?.['x-signature']) as
     | string
@@ -152,7 +168,7 @@ export function createSignMiddleware(params: {
         fail(res, 'SIGNATURE_REPLAY_STORAGE_MISSING', '防重放存储不可用', 500);
         return;
       }
-      const nonceKey = `obl:usdt:api-sign:nonce:${nonceTrimmed}`;
+      const nonceKey = `obl:usdt:api-sign:nonce:${bizOrderNo}:${nonceTrimmed}`;
       try {
         const ttlSeconds = Math.max(60, Math.min(7200, maxSkewSeconds * 2));
         const setRes = await redis.set(nonceKey, '1', 'EX', ttlSeconds, 'NX');
@@ -168,7 +184,7 @@ export function createSignMiddleware(params: {
       const canonical = buildCanonicalQuery(pickCreateFields(body));
       const expected = hmacSha256Hex(token, canonical);
 
-      if (String(signature).toLowerCase() !== expected.toLowerCase()) {
+      if (!isSafeEqualHex(signature, expected)) {
         fail(res, 'SIGNATURE_INVALID', '签名无效', 401);
         return;
       }

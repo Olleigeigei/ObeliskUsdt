@@ -42,3 +42,4 @@ export function initObeliskUSDT(deps: ObeliskUSDTDeps): ObeliskUSDTInstance {
 }
 
 export * from './types';
+export * from './migrations/runMigrations';
