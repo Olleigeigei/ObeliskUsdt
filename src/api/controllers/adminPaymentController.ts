@@ -237,6 +237,7 @@ export function createAdminPaymentController(services: { orderService: any; conf
           PaymentOrder.count({ where: { status: 'failed' } }),
           PaymentTransaction.count(),
         ]);
+        const scannerStats = services.scanner?.getHealthStats ? services.scanner.getHealthStats() : null;
         success(res, {
           ordersTotal,
           pending,
@@ -245,6 +246,7 @@ export function createAdminPaymentController(services: { orderService: any; conf
           completed,
           failed,
           txTotal,
+          scanner: scannerStats,
         }, '获取支付统计成功');
       } catch (error: any) {
         fail(res, 'GET_PAYMENT_STATS_FAILED', error?.message || '获取支付统计失败', 500);

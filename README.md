@@ -98,12 +98,31 @@ npm ls @obeliskstudio/obelisk-usdt
 
 ## 5 分钟接入清单
 
-1. 准备数据库并执行迁移脚本（`database/migrations`）。
+1. 准备数据库并执行迁移脚本（推荐使用内置迁移执行器）。
 2. 在宿主项目中初始化 `initObeliskUSDT(...)`。
 3. 挂载 `paymentRouter` 与 `adminRouter`。
 4. 配置并启动扫描器：`startScanner()`。
 5. 实现 `onOrderConfirmed` 幂等发放逻辑。
 6. 管理端先添加收款钱包，再开放支付入口。
+
+## 数据库迁移（推荐）
+
+包内提供 `runObeliskUSDTMigrations()`，用于自动执行 `database/migrations/*.sql`：
+
+```ts
+import { runObeliskUSDTMigrations } from '@obeliskstudio/obelisk-usdt';
+
+await runObeliskUSDTMigrations({
+  sequelize,
+  logger,
+});
+```
+
+说明：
+
+- 会自动创建迁移记录表：`obl_usdt_schema_migrations`
+- 已执行迁移会自动跳过
+- 不会在 `initObeliskUSDT()` 时自动改库，需由宿主在部署/启动阶段主动调用
 
 ## 示例目录（当前状态）
 
@@ -212,7 +231,8 @@ usdt.registerScheduledTasks(cron);
 同时启用 `ts + nonce` 防重放：
 
 - `ts` 超出允许时间窗口会拒绝（默认 300 秒，可通过 `apiSignMaxSkewSeconds` 调整）
-- `nonce` 会写入 Redis（`SET NX EX`），同一个 nonce 只能用一次
+- `nonce` 会写入 Redis（`SET NX EX`），按 `bizOrderNo + nonce` 作用域防重放
+- 签名比较使用 `crypto.timingSafeEqual`，降低时序侧信道风险
 
 签名步骤：
 
@@ -297,6 +317,15 @@ await bot.sendPhoto(chatId, result.qrPngBuffer, {
 - 查询/取消接口必须校验订单归属
 - `onOrderConfirmed` 发放逻辑必须幂等
 - 密钥必须使用环境变量，禁止硬编码
+- 扫描器对第三方链上接口启用短熔断降频，避免外部抖动拖垮主流程
+
+## 性能与稳定性优化
+
+- 钱包扫描启用固定并发池，提升多钱包场景吞吐。
+- 扫描配置启用短缓存，减少高频配置读取开销。
+- 扫描间隔自适应：有交易提速，无交易降频。
+- 订单确认使用异步回调队列（重试 + 死信），避免慢回调阻塞主扫描链路。
+- 管理统计接口 `GET /admin/payment/stats` 返回扫描器健康指标（熔断与队列状态）。
 
 ## 数据表
 
