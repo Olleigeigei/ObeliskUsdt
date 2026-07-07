@@ -1,7 +1,7 @@
 /**
  * 支付订单模型
  *
- * @author Telegram @Mhuai8
+ * @author Telegram @okgeceo
  */
 
 import { DataTypes, Model, Optional, type Sequelize } from 'sequelize';
@@ -73,7 +73,7 @@ class PaymentOrder
           amountInSun: { type: DataTypes.STRING(20), allowNull: false, field: 'amount_in_sun' },
           walletAddress: { type: DataTypes.STRING(42), allowNull: false, field: 'wallet_address' },
           walletId: { type: DataTypes.BIGINT, allowNull: false, field: 'wallet_id' },
-          status: { type: DataTypes.ENUM('pending', 'paid', 'confirmed', 'completed', 'expired', 'failed', 'cancelled'), defaultValue: 'pending' },
+          status: { type: DataTypes.STRING(32), allowNull: false, defaultValue: 'pending' },
           txHash: { type: DataTypes.STRING(64), allowNull: true, field: 'tx_hash' },
           blockNumber: { type: DataTypes.BIGINT, allowNull: true, field: 'block_number' },
           confirmations: { type: DataTypes.INTEGER, defaultValue: 0 },
