@@ -1,7 +1,7 @@
 /**
  * 支付模块默认按钮模板
  *
- * @author Telegram @Mhuai8
+ * @author Telegram @okgeceo
  */
 
 export const defaultPaymentKeyboards = {

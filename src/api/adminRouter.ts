@@ -1,21 +1,24 @@
 /**
  * 管理支付路由
  *
- * @author Telegram @Mhuai8
+ * @author Telegram @okgeceo
  */
 
 import express, { Router } from 'express';
-import type { ObeliskUSDTDeps } from '../types';
+import type { ObeliskUSDTDepsResolved } from '../types';
 import { resolveAuthMiddleware } from './middleware';
 import { createAdminPaymentController } from './controllers/adminPaymentController';
 
 export function createAdminRouter(
-  deps: ObeliskUSDTDeps,
+  deps: ObeliskUSDTDepsResolved,
   services: { orderService: any; configService: any; scanner: any },
 ): Router {
   const router: Router = express.Router();
   const auth = resolveAuthMiddleware(deps);
-  const controller = createAdminPaymentController(services);
+  const controller = createAdminPaymentController({
+    ...services,
+    persistence: deps.persistence,
+  });
 
   router.get('/admin/payment/wallets/stats', auth.admin, controller.getWalletStats);
   router.get('/admin/payment/wallets', auth.admin, controller.getWalletList);

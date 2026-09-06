@@ -1,7 +1,7 @@
 /**
  * 认证中间件适配
  *
- * @author Telegram @Mhuai8
+ * @author Telegram @okgeceo
  */
 
 import type { RequestHandler } from 'express';

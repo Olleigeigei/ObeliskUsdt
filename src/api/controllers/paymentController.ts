@@ -1,16 +1,21 @@
 /**
  * 用户支付控制器
  *
- * @author Telegram @Mhuai8
+ * @author Telegram @okgeceo
  */
 
 import type { Request, Response } from 'express';
 import crypto from 'crypto';
-import { Op } from 'sequelize';
-import PaymentOrder from '../../models/PaymentOrder';
+import type { ObeliskPersistence } from '../../persistence/obeliskPersistence';
 import { success, fail } from '../response';
 
-export function createPaymentController(services: { orderService: any; config: any; redis: any }) {
+export function createPaymentController(services: {
+  orderService: any;
+  config: any;
+  redis: any;
+  persistence: ObeliskPersistence;
+}) {
+  const { order } = services.persistence;
   const safeIsPlainObject = (value: unknown): value is Record<string, unknown> =>
     Boolean(value) && typeof value === 'object' && !Array.isArray(value);
   const moneyRegex = /^\d+(\.\d{1,2})?$/;
@@ -41,7 +46,7 @@ export function createPaymentController(services: { orderService: any; config: a
     return Math.max(60, Math.min(48 * 3600, ttl));
   }
 
-  function isTokenMatched(order: any, token: string): boolean {
+  function isTokenMatched(order: { metadata?: unknown }, token: string): boolean {
     const metadata = (order as any)?.metadata || null;
     const expected = metadata && typeof metadata === 'object' ? String((metadata as any).orderTokenHash || '') : '';
     if (!expected) return false;
@@ -110,14 +115,7 @@ export function createPaymentController(services: { orderService: any; config: a
           }
         }
 
-        const existingOrder: any = await PaymentOrder.findOne({
-          where: {
-            bizOrderNo,
-            status: { [Op.in]: ['pending', 'paid', 'confirmed'] },
-            expiresAt: { [Op.gt]: new Date() },
-          },
-          order: [['createdAt', 'DESC']],
-        });
+        const existingOrder = await order.findActiveBizOrderDuplicate(bizOrderNo, new Date());
 
         if (existingOrder) {
           if (String(existingOrder.baseAmount) !== baseAmountParsed.normalized) {
@@ -152,7 +150,7 @@ export function createPaymentController(services: { orderService: any; config: a
             : {};
           metadata.orderTokenHash = hashToken(rotatedToken);
           try {
-            await existingOrder.update({ metadata } as any);
+            await order.updateById(existingOrder.id, { metadata });
             await redis.set(tokenKey, rotatedToken, 'EX', getOrderTokenTtlSeconds(existingOrder.expiresAt));
           } catch (error) {
             fail(res, 'ORDER_TOKEN_STORE_FAILED', '订单令牌存储写失败', 500);
@@ -173,7 +171,7 @@ export function createPaymentController(services: { orderService: any; config: a
         }
 
         const orderToken = crypto.randomBytes(24).toString('hex');
-        const order = await services.orderService.createOrder({
+        const created = await services.orderService.createOrder({
           baseAmount: baseAmountParsed.normalized,
           bizOrderNo,
           metadata: {
@@ -182,20 +180,20 @@ export function createPaymentController(services: { orderService: any; config: a
           },
         });
         try {
-          await redis.set(getOrderTokenRedisKey(order.orderNo), orderToken, 'EX', getOrderTokenTtlSeconds(order.expiresAt));
+          await redis.set(getOrderTokenRedisKey(created.orderNo), orderToken, 'EX', getOrderTokenTtlSeconds(created.expiresAt));
         } catch (error) {
           fail(res, 'ORDER_TOKEN_STORE_FAILED', '订单令牌存储写失败', 500);
           return;
         }
 
         success(res, {
-          id: order.id,
-          orderNo: order.orderNo,
-          bizOrderNo: order.bizOrderNo,
-          status: order.status,
-          actualAmount: order.actualAmount,
-          walletAddress: order.walletAddress,
-          expiresAt: order.expiresAt,
+          id: created.id,
+          orderNo: created.orderNo,
+          bizOrderNo: created.bizOrderNo,
+          status: created.status,
+          actualAmount: created.actualAmount,
+          walletAddress: created.walletAddress,
+          expiresAt: created.expiresAt,
           orderToken,
         }, '创建支付订单成功');
       } catch (error: any) {
@@ -217,31 +215,31 @@ export function createPaymentController(services: { orderService: any; config: a
           return;
         }
 
-        const order: any = await PaymentOrder.findOne({ where: { orderNo } });
-        if (order && !isTokenMatched(order, token)) {
+        const row = await order.findByOrderNo(orderNo);
+        if (row && !isTokenMatched(row, token)) {
           fail(res, 'ORDER_NOT_FOUND', '订单不存在或无权限查看', 404);
           return;
         }
 
-        if (!order) {
+        if (!row) {
           fail(res, 'ORDER_NOT_FOUND', '订单不存在或无权限查看', 404);
           return;
         }
 
         success(res, {
-          id: order.id,
-          orderNo: order.orderNo,
-          bizOrderNo: order.bizOrderNo,
-          status: order.status,
-          actualAmount: order.actualAmount,
-          walletAddress: order.walletAddress,
-          txHash: order.txHash,
-          confirmations: order.confirmations,
-          requiredConfirmations: order.requiredConfirmations,
-          paidAt: order.paidAt,
-          confirmedAt: order.confirmedAt,
-          completedAt: order.completedAt,
-          expiresAt: order.expiresAt,
+          id: row.id,
+          orderNo: row.orderNo,
+          bizOrderNo: row.bizOrderNo,
+          status: row.status,
+          actualAmount: row.actualAmount,
+          walletAddress: row.walletAddress,
+          txHash: row.txHash,
+          confirmations: row.confirmations,
+          requiredConfirmations: row.requiredConfirmations,
+          paidAt: row.paidAt,
+          confirmedAt: row.confirmedAt,
+          completedAt: row.completedAt,
+          expiresAt: row.expiresAt,
         }, '获取支付状态成功');
       } catch (error: any) {
         fail(res, 'GET_PAYMENT_STATUS_FAILED', error?.message || '获取支付状态失败', 500);
@@ -262,12 +260,12 @@ export function createPaymentController(services: { orderService: any; config: a
           return;
         }
 
-        const order: any = await PaymentOrder.findOne({ where: { orderNo } });
-        if (!order) {
+        const row = await order.findByOrderNo(orderNo);
+        if (!row) {
           fail(res, 'ORDER_NOT_FOUND', '订单不存在或无权限查看', 404);
           return;
         }
-        if (!isTokenMatched(order, token)) {
+        if (!isTokenMatched(row, token)) {
           fail(res, 'ORDER_NOT_FOUND', '订单不存在或无权限查看', 404);
           return;
         }

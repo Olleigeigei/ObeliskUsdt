@@ -1,10 +1,10 @@
 /**
  * Bot 命令与回调桥接
  *
- * @author Telegram @Mhuai8
+ * @author Telegram @okgeceo
  */
 
-import type { ObeliskUSDTDeps } from '../types';
+import type { ObeliskUSDTDepsResolved } from '../types';
 import { createSubscriptionCallbacks } from './subscriptionCallbacks';
 import { createTemplateResolver } from './templateResolver';
 import type { CreateOrderWithQRParams, CreateOrderWithQRResult } from '../services/botPaymentService';
@@ -16,7 +16,7 @@ interface CommandContext {
 }
 
 export function createBotBridge(
-  deps: ObeliskUSDTDeps,
+  deps: ObeliskUSDTDepsResolved,
   services: { botPaymentService: any; orderService: any },
 ) {
   const templates = createTemplateResolver(deps);

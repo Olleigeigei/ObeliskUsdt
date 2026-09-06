@@ -1,17 +1,17 @@
 /**
  * 用户支付路由
  *
- * @author Telegram @Mhuai8
+ * @author Telegram @okgeceo
  */
 
 import express, { Router } from 'express';
-import type { ObeliskUSDTDeps } from '../types';
+import type { ObeliskUSDTDepsResolved } from '../types';
 import { resolveAuthMiddleware } from './middleware';
 import { createPaymentController } from './controllers/paymentController';
 import { createSignMiddleware } from './signMiddleware';
 
 export function createPaymentRouter(
-  deps: ObeliskUSDTDeps,
+  deps: ObeliskUSDTDepsResolved,
   services: { orderService: any; configService: any },
 ): Router {
   const router: Router = express.Router();
@@ -20,6 +20,7 @@ export function createPaymentRouter(
     orderService: services.orderService,
     config: deps.config,
     redis: deps.redis,
+    persistence: deps.persistence,
   });
 
   const signMiddleware = createSignMiddleware({

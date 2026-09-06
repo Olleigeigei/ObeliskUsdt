@@ -1,10 +1,10 @@
 /**
  * 订阅回调处理器
  *
- * @author Telegram @Mhuai8
+ * @author Telegram @okgeceo
  */
 
-import type { ObeliskUSDTDeps } from '../types';
+import type { ObeliskUSDTDepsResolved } from '../types';
 
 interface CallbackContext {
   bot: {
@@ -20,7 +20,7 @@ interface CallbackContext {
 }
 
 export function createSubscriptionCallbacks(
-  deps: ObeliskUSDTDeps,
+  deps: ObeliskUSDTDepsResolved,
   _services: { orderService: any; botPaymentService: any },
   templates: { getMessage: (path: string) => string; getKeyboard: (path: string) => string },
 ) {

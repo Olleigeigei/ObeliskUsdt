@@ -1,17 +1,13 @@
 /**
  * 链上扫描服务（子包内实现）
  *
- * @author Telegram @Mhuai8
+ * @author Telegram @okgeceo
  */
 
 import Decimal from 'decimal.js';
 import TronWebModule from 'tronweb';
-import { Op } from 'sequelize';
 import axios from 'axios';
-import PaymentOrder from '../models/PaymentOrder';
-import PaymentWallet from '../models/PaymentWallet';
-import PaymentTransaction from '../models/PaymentTransaction';
-import type { ConfirmedOrder, ObeliskUSDTDeps } from '../types';
+import type { ConfirmedOrder, ObeliskUSDTDepsResolved } from '../types';
 
 const TronWeb = (TronWebModule as any).TronWeb || (TronWebModule as any).default || TronWebModule;
 
@@ -47,7 +43,8 @@ interface ScannerHealthStats {
   idleRounds: number;
 }
 
-export function createBlockScannerService(deps: ObeliskUSDTDeps, configService: any, orderService?: any) {
+export function createBlockScannerService(deps: ObeliskUSDTDepsResolved, configService: any, orderService?: any) {
+  const { order, wallet, transaction } = deps.persistence;
   let tronWeb: any = null;
   let isScanning = false;
   let timer: NodeJS.Timeout | null = null;
@@ -296,66 +293,56 @@ export function createBlockScannerService(deps: ObeliskUSDTDeps, configService: 
       }
     }
 
-    const [txRecord] = await PaymentTransaction.findOrCreate({
-      where: { txHash: transfer.txHash },
-      defaults: {
-        txHash: transfer.txHash,
-        fromAddress: transfer.fromAddress,
-        toAddress: transfer.toAddress,
-        amount: transfer.amountSun,
-        amountInUSDT: transfer.amountUsdt,
-        blockNumber: resolvedBlockNumber,
-        blockTimestamp: transfer.blockTimestamp,
-        isMatched: false,
-      } as any,
+    const { row: txRecord } = await transaction.findOrCreateIncoming(transfer.txHash, {
+      txHash: transfer.txHash,
+      fromAddress: transfer.fromAddress,
+      toAddress: transfer.toAddress,
+      amount: transfer.amountSun,
+      amountInUSDT: transfer.amountUsdt,
+      blockNumber: resolvedBlockNumber,
+      blockTimestamp: transfer.blockTimestamp,
+      isMatched: false,
     });
 
     if (txRecord.isMatched) return;
 
-    const order = await PaymentOrder.findOne({
-      where: {
-        status: 'pending',
-        walletAddress: transfer.toAddress,
-        actualAmount: transfer.amountUsdt,
-        expiresAt: { [Op.gt]: new Date() },
-      },
-      order: [['createdAt', 'ASC']],
+    const matchedOrder = await order.findPendingForIncomingMatch({
+      walletAddress: transfer.toAddress,
+      actualAmount: transfer.amountUsdt,
+      now: new Date(),
     });
-    if (!order) return;
+    if (!matchedOrder) return;
 
-    const [affectedRows] = await PaymentOrder.update(
-      {
-        status: 'paid',
-        txHash: transfer.txHash,
-        blockNumber: resolvedBlockNumber > 0 ? resolvedBlockNumber : null,
-        paidAt: new Date(),
-      },
-      { where: { id: order.id, status: 'pending' } },
-    );
+    const affectedRows = await order.updateToPaidIfStillPending(matchedOrder.id, {
+      status: 'paid',
+      txHash: transfer.txHash,
+      blockNumber: resolvedBlockNumber > 0 ? resolvedBlockNumber : null,
+      paidAt: new Date(),
+    });
     if (affectedRows === 0) return;
 
-    await txRecord.update({
-      orderId: order.id,
-      orderNo: order.orderNo,
+    await transaction.updateById(txRecord.id, {
+      orderId: matchedOrder.id,
+      orderNo: matchedOrder.orderNo,
       isMatched: true,
       matchedAt: new Date(),
-    } as any);
+    });
 
     if (orderService?.amountService?.releaseLock) {
       try {
-        await orderService.amountService.releaseLock(order.walletAddress, order.actualAmount);
+        await orderService.amountService.releaseLock(matchedOrder.walletAddress, matchedOrder.actualAmount);
       } catch (error) {
         deps.logger.warn('[ObeliskUSDT] 释放金额锁失败', {
-          orderNo: order.orderNo,
-          walletAddress: order.walletAddress,
-          actualAmount: order.actualAmount,
+          orderNo: matchedOrder.orderNo,
+          walletAddress: matchedOrder.walletAddress,
+          actualAmount: matchedOrder.actualAmount,
           error,
         });
       }
     }
 
     deps.logger.info('[ObeliskUSDT] 匹配到支付交易', {
-      orderNo: order.orderNo,
+      orderNo: matchedOrder.orderNo,
       txHash: transfer.txHash,
       walletAddress: transfer.toAddress,
       actualAmount: transfer.amountUsdt,
@@ -369,26 +356,26 @@ export function createBlockScannerService(deps: ObeliskUSDTDeps, configService: 
       });
       return { matchedCount: 0 };
     }
-    const wallets = await PaymentWallet.findAll({ where: { isActive: true }, attributes: ['address'] });
+    const walletAddresses = await wallet.listActiveAddresses();
     let cursor = 0;
     let matchedCount = 0;
-    const workers = Array.from({ length: Math.min(walletScanConcurrency, wallets.length) }).map(async () => {
+    const workers = Array.from({ length: Math.min(walletScanConcurrency, walletAddresses.length) }).map(async () => {
       while (true) {
         if (isProviderCircuitOpen()) return;
         const idx = cursor;
         cursor += 1;
-        if (idx >= wallets.length) return;
-        const wallet = wallets[idx];
+        if (idx >= walletAddresses.length) return;
+        const walletAddress = walletAddresses[idx];
         try {
-          const transfers = await fetchTransfersByWallet(wallet.address);
+          const transfers = await fetchTransfersByWallet(walletAddress);
           onProviderSuccess();
           matchedCount += transfers.length;
           for (const transfer of transfers) {
             await markPaidOrder(transfer);
           }
         } catch (error) {
-          onProviderFailure(error, wallet.address);
-          deps.logger.warn('[ObeliskUSDT] 钱包扫描失败', { wallet: wallet.address, error });
+          onProviderFailure(error, walletAddress);
+          deps.logger.warn('[ObeliskUSDT] 钱包扫描失败', { wallet: walletAddress, error });
         }
       }
     });
@@ -402,29 +389,29 @@ export function createBlockScannerService(deps: ObeliskUSDTDeps, configService: 
     for (const item of callbackQueue.slice()) {
       if (item.nextRetryAt > now) continue;
       try {
-        const order = await PaymentOrder.findByPk(item.orderId);
-        if (!order) {
+        const orderRow = await order.findById(item.orderId);
+        if (!orderRow) {
           queuedOrderIds.delete(item.orderId);
           callbackQueue.splice(callbackQueue.indexOf(item), 1);
           continue;
         }
-        if (order.status === 'completed') {
+        if (orderRow.status === 'completed') {
           queuedOrderIds.delete(item.orderId);
           callbackQueue.splice(callbackQueue.indexOf(item), 1);
           continue;
         }
-        if (order.status !== 'confirmed') {
+        if (orderRow.status !== 'confirmed') {
           continue;
         }
 
-        await dispatchConfirmedOrder(order);
-        await order.update({ status: 'completed', completedAt: new Date() } as any);
+        await dispatchConfirmedOrder(orderRow);
+        await order.updateById(orderRow.id, { status: 'completed', completedAt: new Date() });
         completedCount += 1;
         queuedOrderIds.delete(item.orderId);
         callbackQueue.splice(callbackQueue.indexOf(item), 1);
         deps.logger.info('[ObeliskUSDT] 订单已完成', {
-          orderNo: order.orderNo,
-          txHash: order.txHash,
+          orderNo: orderRow.orderNo,
+          txHash: orderRow.txHash,
         });
       } catch (error: any) {
         item.retries += 1;
@@ -467,41 +454,36 @@ export function createBlockScannerService(deps: ObeliskUSDTDeps, configService: 
 
   async function updateConfirmations(): Promise<{ confirmedCount: number }> {
     await ensureTronWeb();
-    const orders = await PaymentOrder.findAll({
-      where: {
-        status: { [Op.in]: ['paid', 'confirmed'] },
-        txHash: { [Op.ne]: null },
-      },
-      limit: 500,
-      order: [['updatedAt', 'ASC']],
-    });
+    const orders = await order.findPaidOrConfirmedWithTx(500);
 
     if (orders.length === 0) return { confirmedCount: 0 };
     const currentBlock = await tronWeb.trx.getCurrentBlock();
     const currentBlockNumber = Number(currentBlock?.block_header?.raw_data?.number || 0);
     let confirmedCount = 0;
 
-    for (const order of orders) {
-      if (!order.blockNumber) continue;
-      const confirmations = Math.max(0, currentBlockNumber - Number(order.blockNumber) + 1);
-      if (order.confirmations !== confirmations) {
-        await order.update({ confirmations } as any);
+    for (const o of orders) {
+      if (!o.blockNumber) continue;
+      const confirmations = Math.max(0, currentBlockNumber - Number(o.blockNumber) + 1);
+      if (o.confirmations !== confirmations) {
+        await order.updateById(o.id, { confirmations });
       }
 
-      if (order.status === 'paid' && confirmations >= Number(order.requiredConfirmations || 6)) {
-        await order.update({ status: 'confirmed', confirmedAt: new Date() } as any);
+      let nextStatus = o.status;
+      if (o.status === 'paid' && confirmations >= Number(o.requiredConfirmations || 6)) {
+        await order.updateById(o.id, { status: 'confirmed', confirmedAt: new Date() });
         confirmedCount += 1;
+        nextStatus = 'confirmed';
         deps.logger.info('[ObeliskUSDT] 订单已确认', {
-          orderNo: order.orderNo,
-          txHash: order.txHash,
+          orderNo: o.orderNo,
+          txHash: o.txHash,
           confirmations,
-          requiredConfirmations: order.requiredConfirmations,
+          requiredConfirmations: o.requiredConfirmations,
         });
-        enqueueConfirmedOrder(order.id);
+        enqueueConfirmedOrder(o.id);
       }
 
-      if (order.status === 'confirmed' && confirmations >= Number(order.requiredConfirmations || 6)) {
-        enqueueConfirmedOrder(order.id);
+      if (nextStatus === 'confirmed' && confirmations >= Number(o.requiredConfirmations || 6)) {
+        enqueueConfirmedOrder(o.id);
       }
     }
     return { confirmedCount };
@@ -560,9 +542,9 @@ export function createBlockScannerService(deps: ObeliskUSDTDeps, configService: 
       await updateConfirmations();
     },
     async dispatchConfirmedOrder(orderId: number): Promise<void> {
-      const order = await PaymentOrder.findByPk(orderId);
-      if (!order) return;
-      await dispatchConfirmedOrder(order);
+      const row = await order.findById(orderId);
+      if (!row) return;
+      await dispatchConfirmedOrder(row);
     },
     getHealthStats(): ScannerHealthStats {
       return {

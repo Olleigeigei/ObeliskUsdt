@@ -1,7 +1,7 @@
 /**
  * ObeliskUSDT 公共类型定义
  *
- * @author Telegram @Mhuai8
+ * @author Telegram @okgeceo
  */
 
 import type { Router, RequestHandler } from 'express';
@@ -12,6 +12,7 @@ import type PaymentOrder from './models/PaymentOrder';
 import type PaymentTransaction from './models/PaymentTransaction';
 import type { PaymentMessages } from '../config/messages';
 import type { PaymentKeyboards } from '../config/keyboards';
+import type { ObeliskPersistence } from './persistence/obeliskPersistence';
 
 export interface LoggerLike {
   info: (...args: unknown[]) => void;
@@ -69,8 +70,12 @@ export interface BotCreateOrderWithQRResult {
   paymentPageUrl: string;
 }
 
+/**
+ * 初始化入参：须提供 `sequelize`（使用内置 Sequelize 实现）或 `persistence`（自定义 Prisma 等）之一。
+ */
 export interface ObeliskUSDTDeps {
-  sequelize: Sequelize;
+  sequelize?: Sequelize;
+  persistence?: ObeliskPersistence;
   redis: Redis;
   logger: LoggerLike;
   config: ObeliskUSDTConfig;
@@ -85,6 +90,9 @@ export interface ObeliskUSDTDeps {
     admin: RequestHandler;
   };
 }
+
+/** 解析后保证存在 persistence，供内部模块使用 */
+export type ObeliskUSDTDepsResolved = Omit<ObeliskUSDTDeps, 'persistence'> & { persistence: ObeliskPersistence };
 
 export interface ObeliskUSDTInstance {
   paymentRouter: Router;
@@ -105,7 +113,8 @@ export interface ObeliskUSDTInstance {
   startScanner(): Promise<void>;
   stopScanner(): Promise<void>;
   registerScheduledTasks(cron: unknown): void;
-  models: {
+  /** 仅在使用 Sequelize 初始化时提供，便于宿主直接访问模型类 */
+  models?: {
     PaymentWallet: typeof PaymentWallet;
     PaymentOrder: typeof PaymentOrder;
     PaymentTransaction: typeof PaymentTransaction;

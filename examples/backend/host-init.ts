@@ -1,7 +1,7 @@
 /**
  * 宿主后端初始化 ObeliskUSDT 示例
  *
- * @author Telegram @Mhuai8
+ * @author Telegram @okgeceo
  */
 
 import type { Express } from 'express';

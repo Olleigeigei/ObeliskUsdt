@@ -1,15 +1,15 @@
 /**
  * Bot 模板解析器
  *
- * @author Telegram @Mhuai8
+ * @author Telegram @okgeceo
  */
 
 import { defaultPaymentMessages } from '../../config/messages';
 import { defaultPaymentKeyboards } from '../../config/keyboards';
 import { deepMerge } from '../utils/deepMerge';
-import type { ObeliskUSDTDeps } from '../types';
+import type { ObeliskUSDTDepsResolved } from '../types';
 
-export function createTemplateResolver(deps: ObeliskUSDTDeps) {
+export function createTemplateResolver(deps: ObeliskUSDTDepsResolved) {
   const messages = deepMerge(defaultPaymentMessages, deps.config.messages as any);
   const keyboards = deepMerge(defaultPaymentKeyboards, deps.config.keyboards as any);
 

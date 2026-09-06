@@ -1,7 +1,7 @@
 /**
  * 增强二维码图片生成
  *
- * @author Telegram @Mhuai8
+ * @author Telegram @okgeceo
  */
 
 import fs from 'fs';

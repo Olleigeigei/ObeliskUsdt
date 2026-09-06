@@ -1,12 +1,12 @@
 /**
  * 支付定时任务注册
  *
- * @author Telegram @Mhuai8
+ * @author Telegram @okgeceo
  */
 
-import type { ObeliskUSDTDeps } from '../types';
+import type { ObeliskUSDTDepsResolved } from '../types';
 
-export function createSchedulerBridge(params: { deps: ObeliskUSDTDeps; scanner: any; orderService?: any }) {
+export function createSchedulerBridge(params: { deps: ObeliskUSDTDepsResolved; scanner: any; orderService?: any }) {
   return {
     register(cron: any): void {
       if (!cron || typeof cron.schedule !== 'function') {

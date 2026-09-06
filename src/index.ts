@@ -1,7 +1,7 @@
 /**
  * ObeliskUSDT 模块入口
  *
- * @author Telegram @Mhuai8
+ * @author Telegram @okgeceo
  */
 
 import { createPaymentRouter } from './api/paymentRouter';
@@ -13,10 +13,28 @@ import { createBotPaymentService } from './services/botPaymentService';
 import { createBotBridge } from './bot/commandHandlers';
 import { createSchedulerBridge } from './scheduler/paymentTasks';
 import { registerModels } from './models';
-import type { ObeliskUSDTDeps, ObeliskUSDTInstance } from './types';
+import { createSequelizeObeliskPersistence } from './persistence/sequelizeObeliskPersistence';
+import type { ObeliskUSDTDeps, ObeliskUSDTDepsResolved, ObeliskUSDTInstance } from './types';
 
-export function initObeliskUSDT(deps: ObeliskUSDTDeps): ObeliskUSDTInstance {
-  const models = registerModels(deps.sequelize);
+export function initObeliskUSDT(depsInput: ObeliskUSDTDeps): ObeliskUSDTInstance {
+  if (!depsInput.persistence && !depsInput.sequelize) {
+    throw new Error('initObeliskUSDT: 请传入 sequelize 或 persistence');
+  }
+
+  let models: ObeliskUSDTInstance['models'];
+  if (depsInput.sequelize) {
+    models = registerModels(depsInput.sequelize);
+  }
+
+  const persistence =
+    depsInput.persistence ??
+    (depsInput.sequelize ? createSequelizeObeliskPersistence(depsInput.sequelize) : null);
+  if (!persistence) {
+    throw new Error('initObeliskUSDT: 无法构造 persistence');
+  }
+
+  const deps: ObeliskUSDTDepsResolved = { ...depsInput, persistence };
+
   const configService = createPaymentConfigService(deps);
   const orderService = createPaymentOrderService(deps, configService);
   const scanner = createBlockScannerService(deps, configService, orderService);
@@ -43,3 +61,5 @@ export function initObeliskUSDT(deps: ObeliskUSDTDeps): ObeliskUSDTInstance {
 
 export * from './types';
 export * from './migrations/runMigrations';
+export type { ObeliskPersistence } from './persistence/obeliskPersistence';
+export { createSequelizeObeliskPersistence } from './persistence/sequelizeObeliskPersistence';
