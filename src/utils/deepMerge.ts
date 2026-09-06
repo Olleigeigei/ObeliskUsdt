@@ -1,7 +1,7 @@
 /**
  * 深度合并工具
  *
- * @author Telegram @Mhuai8
+ * @author Telegram @okgeceo
  */
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

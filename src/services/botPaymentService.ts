@@ -1,11 +1,11 @@
 /**
  * Bot 支付服务
  *
- * @author Telegram @Mhuai8
+ * @author Telegram @okgeceo
  */
 
 import { buildEnhancedQrImage } from './qrImage';
-import type { ObeliskUSDTDeps } from '../types';
+import type { ObeliskUSDTDepsResolved } from '../types';
 
 export interface CreateOrderWithQRParams {
   bizOrderNo: string;
@@ -23,7 +23,7 @@ export interface CreateOrderWithQRResult {
   paymentPageUrl: string;
 }
 
-export function createBotPaymentService(deps: ObeliskUSDTDeps, services: { orderService: any; configService: any }) {
+export function createBotPaymentService(deps: ObeliskUSDTDepsResolved, services: { orderService: any; configService: any }) {
   function getPaymentPageBaseUrl(): string {
     return (deps.config.webUrl || '').replace(/\/$/, '');
   }

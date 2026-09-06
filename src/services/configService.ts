@@ -1,10 +1,10 @@
 /**
  * 支付配置服务
  *
- * @author Telegram @Mhuai8
+ * @author Telegram @okgeceo
  */
 
-import type { ObeliskUSDTDeps } from '../types';
+import type { ObeliskUSDTDeps, ObeliskUSDTDepsResolved } from '../types';
 
 type SettingStore = {
   get(key: string): Promise<string | null>;
@@ -24,7 +24,7 @@ function createFallbackStore(_config: ObeliskUSDTDeps['config']): SettingStore {
   };
 }
 
-export function createPaymentConfigService(deps: ObeliskUSDTDeps) {
+export function createPaymentConfigService(deps: ObeliskUSDTDeps | ObeliskUSDTDepsResolved) {
   const store = deps.configStore || createFallbackStore(deps.config);
 
   return {

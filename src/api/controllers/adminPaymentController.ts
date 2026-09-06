@@ -1,14 +1,11 @@
 /**
  * 管理支付控制器
  *
- * @author Telegram @Mhuai8
+ * @author Telegram @okgeceo
  */
 
-import { Op } from 'sequelize';
 import type { Request, Response } from 'express';
-import PaymentWallet from '../../models/PaymentWallet';
-import PaymentOrder from '../../models/PaymentOrder';
-import PaymentTransaction from '../../models/PaymentTransaction';
+import type { ObeliskPersistence } from '../../persistence/obeliskPersistence';
 import { success, fail } from '../response';
 
 function toPositiveInt(value: unknown, defaultValue: number): number {
@@ -17,12 +14,19 @@ function toPositiveInt(value: unknown, defaultValue: number): number {
   return Math.max(1, Math.floor(parsed));
 }
 
-export function createAdminPaymentController(services: { orderService: any; configService: any; scanner: any }) {
+export function createAdminPaymentController(services: {
+  orderService: any;
+  configService: any;
+  scanner: any;
+  persistence: ObeliskPersistence;
+}) {
+  const { order, wallet, transaction } = services.persistence;
+
   return {
     getWalletStats: async (_req: Request, res: Response) => {
       try {
-        const total = await PaymentWallet.count();
-        const active = await PaymentWallet.count({ where: { isActive: true } });
+        const total = await wallet.count();
+        const active = await wallet.countActive();
         success(res, { total, active, inactive: total - active }, '获取钱包统计成功');
       } catch (error: any) {
         fail(res, 'GET_WALLET_STATS_FAILED', error?.message || '获取钱包统计失败', 500);
@@ -31,7 +35,7 @@ export function createAdminPaymentController(services: { orderService: any; conf
 
     getWalletList: async (_req: Request, res: Response) => {
       try {
-        const list = await PaymentWallet.findAll({ order: [['priority', 'ASC'], ['createdAt', 'DESC']] });
+        const list = await wallet.listForAdminOrdered();
         success(res, { list }, '获取钱包列表成功');
       } catch (error: any) {
         fail(res, 'GET_WALLET_LIST_FAILED', error?.message || '获取钱包列表失败', 500);
@@ -41,7 +45,7 @@ export function createAdminPaymentController(services: { orderService: any; conf
     getWalletDetail: async (req: Request, res: Response) => {
       try {
         const id = Number(req.params.id);
-        const item = await PaymentWallet.findByPk(id);
+        const item = await wallet.findById(id);
         if (!item) {
           fail(res, 'WALLET_NOT_FOUND', '钱包不存在', 404);
           return;
@@ -55,12 +59,12 @@ export function createAdminPaymentController(services: { orderService: any; conf
     createWallet: async (req: Request, res: Response) => {
       try {
         const body = req.body || {};
-        const item = await PaymentWallet.create({
+        const item = await wallet.create({
           address: String(body.address || '').trim(),
           label: String(body.label || '').trim(),
           isActive: body.isActive !== false,
           priority: Number(body.priority || 0),
-        } as any);
+        });
         success(res, item, '创建钱包成功');
       } catch (error: any) {
         fail(res, 'CREATE_WALLET_FAILED', error?.message || '创建钱包失败', 500);
@@ -71,18 +75,19 @@ export function createAdminPaymentController(services: { orderService: any; conf
       try {
         const id = Number(req.params.id);
         const body = req.body || {};
-        const item = await PaymentWallet.findByPk(id);
+        const item = await wallet.findById(id);
         if (!item) {
           fail(res, 'WALLET_NOT_FOUND', '钱包不存在', 404);
           return;
         }
-        await item.update({
+        await wallet.updateById(id, {
           address: body.address !== undefined ? String(body.address).trim() : item.address,
           label: body.label !== undefined ? String(body.label).trim() : item.label,
           isActive: body.isActive !== undefined ? Boolean(body.isActive) : item.isActive,
           priority: body.priority !== undefined ? Number(body.priority) : item.priority,
-        } as any);
-        success(res, item, '更新钱包成功');
+        });
+        const next = await wallet.findById(id);
+        success(res, next, '更新钱包成功');
       } catch (error: any) {
         fail(res, 'UPDATE_WALLET_FAILED', error?.message || '更新钱包失败', 500);
       }
@@ -91,12 +96,12 @@ export function createAdminPaymentController(services: { orderService: any; conf
     deleteWallet: async (req: Request, res: Response) => {
       try {
         const id = Number(req.params.id);
-        const item = await PaymentWallet.findByPk(id);
+        const item = await wallet.findById(id);
         if (!item) {
           fail(res, 'WALLET_NOT_FOUND', '钱包不存在', 404);
           return;
         }
-        await item.destroy();
+        await wallet.deleteById(id);
         success(res, { id }, '删除钱包成功');
       } catch (error: any) {
         fail(res, 'DELETE_WALLET_FAILED', error?.message || '删除钱包失败', 500);
@@ -107,20 +112,19 @@ export function createAdminPaymentController(services: { orderService: any; conf
       try {
         const page = toPositiveInt(req.query.page, 1);
         const pageSize = Math.min(200, toPositiveInt(req.query.pageSize, 20));
-        const where: Record<string, unknown> = {};
-        if (req.query.status) where.status = String(req.query.status);
-        if (req.query.orderNo) where.orderNo = { [Op.like]: `%${String(req.query.orderNo)}%` };
+        const status = req.query.status ? String(req.query.status) as any : undefined;
+        const orderNoContains = req.query.orderNo ? String(req.query.orderNo) : undefined;
 
-        const { rows, count } = await PaymentOrder.findAndCountAll({
-          where,
-          order: [['createdAt', 'DESC']],
-          limit: pageSize,
-          offset: (page - 1) * pageSize,
+        const { rows, total } = await order.findPagedForAdmin({
+          page,
+          pageSize,
+          status,
+          orderNoContains,
         });
 
         success(res, {
           list: rows,
-          pagination: { page, pageSize, total: count },
+          pagination: { page, pageSize, total },
         }, '获取订单列表成功');
       } catch (error: any) {
         fail(res, 'GET_ORDER_LIST_FAILED', error?.message || '获取订单列表失败', 500);
@@ -130,7 +134,7 @@ export function createAdminPaymentController(services: { orderService: any; conf
     getOrderDetail: async (req: Request, res: Response) => {
       try {
         const id = Number(req.params.id);
-        const item = await PaymentOrder.findByPk(id);
+        const item = await order.findById(id);
         if (!item) {
           fail(res, 'ORDER_NOT_FOUND', '订单不存在', 404);
           return;
@@ -144,7 +148,7 @@ export function createAdminPaymentController(services: { orderService: any; conf
     confirmOrder: async (req: Request, res: Response) => {
       try {
         const id = Number(req.params.id);
-        const item = await PaymentOrder.findByPk(id);
+        const item = await order.findById(id);
         if (!item) {
           fail(res, 'ORDER_NOT_FOUND', '订单不存在', 404);
           return;
@@ -155,13 +159,14 @@ export function createAdminPaymentController(services: { orderService: any; conf
         }
 
         if (item.status === 'paid') {
-          await item.update({ status: 'confirmed', confirmedAt: new Date() } as any);
+          await order.updateById(id, { status: 'confirmed', confirmedAt: new Date() });
         }
 
         await services.scanner.dispatchConfirmedOrder(item.id);
-        await item.update({ status: 'completed', completedAt: new Date() } as any);
+        await order.updateById(id, { status: 'completed', completedAt: new Date() });
 
-        success(res, item, '确认订单成功');
+        const next = await order.findById(id);
+        success(res, next, '确认订单成功');
       } catch (error: any) {
         fail(res, 'CONFIRM_ORDER_FAILED', error?.message || '确认订单失败', 500);
       }
@@ -180,7 +185,7 @@ export function createAdminPaymentController(services: { orderService: any; conf
     updateOrderRemark: async (req: Request, res: Response) => {
       try {
         const id = Number(req.params.id);
-        const item = await PaymentOrder.findByPk(id);
+        const item = await order.findById(id);
         if (!item) {
           fail(res, 'ORDER_NOT_FOUND', '订单不存在', 404);
           return;
@@ -188,8 +193,9 @@ export function createAdminPaymentController(services: { orderService: any; conf
         const remark = String((req.body || {}).remark || '').trim();
         const metadata = (item.metadata || {}) as Record<string, unknown>;
         metadata.remark = remark;
-        await item.update({ metadata } as any);
-        success(res, item, '更新备注成功');
+        await order.updateById(id, { metadata });
+        const next = await order.findById(id);
+        success(res, next, '更新备注成功');
       } catch (error: any) {
         fail(res, 'UPDATE_ORDER_REMARK_FAILED', error?.message || '更新备注失败', 500);
       }
@@ -198,12 +204,12 @@ export function createAdminPaymentController(services: { orderService: any; conf
     deleteOrder: async (req: Request, res: Response) => {
       try {
         const id = Number(req.params.id);
-        const item = await PaymentOrder.findByPk(id);
+        const item = await order.findById(id);
         if (!item) {
           fail(res, 'ORDER_NOT_FOUND', '订单不存在', 404);
           return;
         }
-        await item.destroy();
+        await order.deleteById(id);
         success(res, { id }, '删除订单成功');
       } catch (error: any) {
         fail(res, 'DELETE_ORDER_FAILED', error?.message || '删除订单失败', 500);
@@ -214,12 +220,7 @@ export function createAdminPaymentController(services: { orderService: any; conf
       try {
         const days = Math.max(1, Number((req.body || {}).days || 30));
         const deadline = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-        const deleted = await PaymentOrder.destroy({
-          where: {
-            status: { [Op.in]: ['expired', 'cancelled', 'failed'] },
-            updatedAt: { [Op.lt]: deadline },
-          },
-        });
+        const deleted = await order.deleteFinishedBefore(deadline, ['expired', 'cancelled', 'failed']);
         success(res, { deleted }, '清理订单成功');
       } catch (error: any) {
         fail(res, 'CLEANUP_ORDERS_FAILED', error?.message || '清理订单失败', 500);
@@ -229,13 +230,13 @@ export function createAdminPaymentController(services: { orderService: any; conf
     getPaymentStats: async (_req: Request, res: Response) => {
       try {
         const [ordersTotal, pending, paid, confirmed, completed, failed, txTotal] = await Promise.all([
-          PaymentOrder.count(),
-          PaymentOrder.count({ where: { status: 'pending' } }),
-          PaymentOrder.count({ where: { status: 'paid' } }),
-          PaymentOrder.count({ where: { status: 'confirmed' } }),
-          PaymentOrder.count({ where: { status: 'completed' } }),
-          PaymentOrder.count({ where: { status: 'failed' } }),
-          PaymentTransaction.count(),
+          order.count(),
+          order.countByStatus('pending'),
+          order.countByStatus('paid'),
+          order.countByStatus('confirmed'),
+          order.countByStatus('completed'),
+          order.countByStatus('failed'),
+          transaction.count(),
         ]);
         const scannerStats = services.scanner?.getHealthStats ? services.scanner.getHealthStats() : null;
         success(res, {

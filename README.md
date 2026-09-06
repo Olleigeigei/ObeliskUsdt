@@ -1,10 +1,10 @@
 # ObeliskUSDT
 
 [![npm version](https://img.shields.io/npm/v/%40obeliskstudio%2Fobelisk-usdt?style=for-the-badge&logo=npm&logoColor=white)](https://www.npmjs.com/package/@obeliskstudio/obelisk-usdt)
-[![Business Contact](https://img.shields.io/badge/Business-Telegram%20%40Mhuai8-26A5E4?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/mhuai8)
+[![Business Contact](https://img.shields.io/badge/Business-Telegram%20%40okgeceo-26A5E4?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/okgeceo)
 [![Studio Channel](https://img.shields.io/badge/Studio-Telegram%20%40ObeliskStudio-1D9BF0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/ObeliskStudio)
 
-> 需要定制或开发支付业务，联系 Telegram：`@Mhuai8`（ObeliskStudio）
+> 需要定制或开发支付业务，联系 Telegram：`@okgeceo`（ObeliskStudio）
 
 `ObeliskUSDT` 是一个专注 USDT-TRC20 的支付收款模块。  
 面向开发者提供可快速接入的 USDT 收款能力，支持网站与机器人双端场景。
@@ -60,9 +60,13 @@
 ## 依赖要求
 
 - Node.js 18+
-- Sequelize（推荐，模块运行依赖；宿主可继续使用 TypeORM）
+- 数据访问（二选一）  
+  - 传入 `sequelize`：使用包内 Sequelize 实现（默认路径，开箱即用）  
+  - 传入 `persistence`：实现 `ObeliskPersistence` 接口，可接入 Prisma、TypeORM、Kysely、原生驱动等，不强制 ORM  
 - Redis
 - TronGrid / TronScan API Key
+
+npm 发布的包内**仅含编译后的 JavaScript**，不包含 TypeScript 声明文件（`.d.ts`）。若在 TypeScript 宿主中使用，可自行编写 `declare module '@obeliskstudio/obelisk-usdt'` 等补充类型。
 
 ## 与同类网关的定位差异
 
@@ -116,6 +120,9 @@ await runObeliskUSDTMigrations({
   sequelize,
   logger,
 });
+
+// 或仅使用通用 SQL 执行函数（需与 Sequelize 的 query/replacements 行为兼容，例如自行封装 Prisma）：
+// await runObeliskUSDTMigrations({ query: myQueryFn, logger });
 ```
 
 说明：
@@ -123,12 +130,14 @@ await runObeliskUSDTMigrations({
 - 会自动创建迁移记录表：`obl_usdt_schema_migrations`
 - 已执行迁移会自动跳过
 - 不会在 `initObeliskUSDT()` 时自动改库，需由宿主在部署/启动阶段主动调用
+- `sequelize` 与 `query` 二选一传入迁移执行器
 
 ## 示例目录（当前状态）
 
 仓库提供与当前接口契约一致的最小示例：
 
 - `examples/backend/host-init.ts`：宿主后端初始化与路由挂载
+- `examples/backend/prisma-persistence.example.ts`：Prisma 实现 `ObeliskPersistence` 示例
 - `examples/backend/payment-api-client.ts`：服务端创建/查询/取消支付订单
 - `examples/web/create-and-poll.ts`：网页端创建订单并轮询支付状态
 - `examples/bot/create-order-with-qr.ts`：机器人创建订单并发送二维码
@@ -345,8 +354,8 @@ await bot.sendPhoto(chatId, result.qrPngBuffer, {
 ## 版权与联系
 
 - Copyright © 2026 ObeliskStudio. All rights reserved.
-- 维护者：`@Mhuai8`（ObeliskStudio）
+- 维护者：`@okgeceo`（ObeliskStudio）
 - 作者邮箱：`aniwaawa@gmail.com` / `mhuai8@outlook.com`
 - 工作室 Telegram：`@ObeliskStudio`
 - 工作室业务：承接定制开发、支付系统、机器人、网站与各类技术外包合作
-- 业务合作：需要定制或开发，联系 `@Mhuai8`
+- 业务合作：需要定制或开发，联系 `@okgeceo`

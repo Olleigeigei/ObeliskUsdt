@@ -1,7 +1,7 @@
 /**
  * API 签名校验中间件
  *
- * @author Telegram @Mhuai8
+ * @author Telegram @okgeceo
  */
 
 import crypto from 'crypto';

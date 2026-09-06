@@ -1,0 +1,98 @@
+// 示例：与包内 database/migrations 中 obl_* 表对齐的 Prisma 描述。
+// 使用方式：复制到宿主项目 prisma/schema.prisma 并合并 generator/datasource，然后执行 npx prisma generate。
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum OblPaymentOrderStatus {
+  pending
+  paid
+  confirmed
+  completed
+  expired
+  failed
+  cancelled
+}
+
+model OblPaymentWallet {
+  id          BigInt   @id @default(autoincrement())
+  address     String   @unique @db.VarChar(42)
+  label       String   @db.VarChar(100)
+  isActive    Boolean  @default(true) @map("is_active")
+  priority    Int      @default(0)
+  totalOrders Int      @default(0) @map("total_orders")
+  totalAmount Decimal  @default(0) @map("total_amount") @db.Decimal(20, 6)
+  lastUsedAt  DateTime? @map("last_used_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  orders OblPaymentOrder[]
+
+  @@map("obl_payment_wallets")
+}
+
+model OblPaymentOrder {
+  id                     BigInt                 @id @default(autoincrement())
+  orderNo                String                 @unique @map("order_no") @db.VarChar(32)
+  bizOrderNo             String                 @map("biz_order_no") @db.VarChar(64)
+  baseAmount             Decimal                @map("base_amount") @db.Decimal(10, 2)
+  actualAmount           Decimal                @map("actual_amount") @db.Decimal(10, 4)
+  amountInSun            String                 @map("amount_in_sun") @db.VarChar(20)
+  walletAddress          String                 @map("wallet_address") @db.VarChar(42)
+  walletId               BigInt                 @map("wallet_id")
+  status                 OblPaymentOrderStatus  @default(pending)
+  txHash                 String?                @map("tx_hash") @db.VarChar(64)
+  blockNumber            BigInt?                @map("block_number")
+  confirmations          Int                    @default(0)
+  requiredConfirmations  Int                    @default(6) @map("required_confirmations")
+  expiresAt              DateTime               @map("expires_at")
+  paidAt                 DateTime?              @map("paid_at")
+  confirmedAt            DateTime?              @map("confirmed_at")
+  completedAt            DateTime?              @map("completed_at")
+  errorMessage           String?                @map("error_message") @db.Text
+  metadata               Json?
+  createdAt              DateTime               @default(now()) @map("created_at")
+  updatedAt              DateTime               @updatedAt @map("updated_at")
+
+  wallet       OblPaymentWallet       @relation(fields: [walletId], references: [id])
+  transactions OblPaymentTransaction[]
+
+  @@index([bizOrderNo], map: "idx_biz_order_no")
+  @@index([status])
+  @@index([walletAddress, actualAmount], map: "idx_wallet_amount")
+  @@index([txHash])
+  @@index([expiresAt])
+  @@index([createdAt])
+  @@map("obl_payment_orders")
+}
+
+model OblPaymentTransaction {
+  id             BigInt    @id @default(autoincrement())
+  txHash         String    @unique @map("tx_hash") @db.VarChar(64)
+  fromAddress    String    @map("from_address") @db.VarChar(42)
+  toAddress      String    @map("to_address") @db.VarChar(42)
+  amount         String    @db.VarChar(20)
+  amountInUsdt   Decimal   @map("amount_in_usdt") @db.Decimal(10, 4)
+  blockNumber    BigInt    @map("block_number")
+  blockTimestamp BigInt    @map("block_timestamp")
+  orderId        BigInt?   @map("order_id")
+  orderNo        String?   @map("order_no") @db.VarChar(32)
+  isMatched      Boolean   @default(false) @map("is_matched")
+  matchedAt      DateTime? @map("matched_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  order OblPaymentOrder? @relation(fields: [orderId], references: [id])
+
+  @@index([toAddress])
+  @@index([orderId])
+  @@index([isMatched])
+  @@index([blockNumber])
+  @@map("obl_payment_transactions")
+}

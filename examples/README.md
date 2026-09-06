@@ -6,6 +6,8 @@
 
 - `backend/host-init.ts`：宿主后端初始化 `ObeliskUSDT` 示例（挂载路由、启动扫描器、回调发放）
 - `backend/payment-api-client.ts`：宿主服务端调用支付接口的示例客户端
+- `backend/prisma-persistence.example.ts`：`ObeliskPersistence` 的 Prisma 实现示例（需宿主安装 `@prisma/client` 并 `prisma generate`）
+- `backend/prisma.schema.example.prisma`：与 `obl_*` 表对齐的 Prisma schema 片段，可复制到宿主 `prisma/schema.prisma`
 - `web/create-and-poll.ts`：网页端创建订单并轮询状态的示例
 - `bot/create-order-with-qr.ts`：机器人侧创建订单并发送二维码的示例
 

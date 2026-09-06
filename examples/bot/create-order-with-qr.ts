@@ -1,7 +1,7 @@
 /**
  * 机器人：创建订单并发送二维码示例
  *
- * @author Telegram @Mhuai8
+ * @author Telegram @okgeceo
  */
 
 import type { ObeliskUSDTInstance } from '../../src/types';

@@ -1,7 +1,7 @@
 /**
  * 支付模型注册
  *
- * @author Telegram @Mhuai8
+ * @author Telegram @okgeceo
  */
 
 import type { Sequelize } from 'sequelize';

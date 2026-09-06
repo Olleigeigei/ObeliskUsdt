@@ -1,7 +1,7 @@
 /**
  * 支付交易模型
  *
- * @author Telegram @Mhuai8
+ * @author Telegram @okgeceo
  */
 
 import { DataTypes, Model, Optional, type Sequelize } from 'sequelize';

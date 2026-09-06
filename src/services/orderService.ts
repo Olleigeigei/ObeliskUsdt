@@ -1,16 +1,15 @@
 /**
  * 订单服务
  *
- * @author Telegram @Mhuai8
+ * @author Telegram @okgeceo
  */
 
-import { Op } from 'sequelize';
-import PaymentOrder from '../models/PaymentOrder';
 import { createAmountAllocationService } from './amountAllocation';
-import type { ObeliskUSDTDeps } from '../types';
+import type { ObeliskUSDTDepsResolved } from '../types';
 
-export function createPaymentOrderService(deps: ObeliskUSDTDeps, configService: any) {
+export function createPaymentOrderService(deps: ObeliskUSDTDepsResolved, configService: any) {
   const amountService = createAmountAllocationService(deps, configService);
+  const { order } = deps.persistence;
 
   function generateOrderNo(): string {
     const timestamp = Date.now();
@@ -39,7 +38,7 @@ export function createPaymentOrderService(deps: ObeliskUSDTDeps, configService: 
       const expireMinutes = await configService.getOrderExpireMinutes();
       expiresAt.setMinutes(expiresAt.getMinutes() + expireMinutes);
       const requiredConfirmations = await configService.getRequiredConfirmations();
-      const order = await PaymentOrder.create({
+      const row = await order.create({
         orderNo: generateOrderNo(),
         bizOrderNo,
         baseAmount: normalizedBaseAmount,
@@ -51,36 +50,32 @@ export function createPaymentOrderService(deps: ObeliskUSDTDeps, configService: 
         status: 'pending',
         expiresAt,
         metadata,
-      } as any);
-      deps.logger.info(`[ObeliskUSDT] 创建订单成功 ${order.orderNo}`);
-      return order;
+      });
+      deps.logger.info(`[ObeliskUSDT] 创建订单成功 ${row.orderNo}`);
+      return row;
     },
     async cancelOrder(orderNo: string): Promise<void> {
-      const order = await PaymentOrder.findOne({ where: { orderNo } });
-      if (!order) throw new Error('订单不存在');
-      if (order.status !== 'pending') throw new Error('只能取消待支付订单');
-      const [affectedRows] = await PaymentOrder.update({ status: 'cancelled' }, { where: { id: order.id, status: 'pending' } });
-      if (affectedRows === 0) throw new Error('订单状态已变更，无法取消');
-      await amountService.releaseLock(order.walletAddress, order.actualAmount);
+      const r = await order.cancelPendingByOrderNo(orderNo);
+      if (!r.order) throw new Error('订单不存在');
+      if (r.order.status !== 'pending') throw new Error('只能取消待支付订单');
+      if (r.affected === 0) throw new Error('订单状态已变更，无法取消');
+      await amountService.releaseLock(r.order.walletAddress, r.order.actualAmount);
     },
     async cancelOrderById(orderId: number): Promise<void> {
-      const order = await PaymentOrder.findByPk(orderId);
-      if (!order) throw new Error('订单不存在');
-      if (order.status !== 'pending') throw new Error('只能取消待支付订单');
-      const [affectedRows] = await PaymentOrder.update({ status: 'cancelled' }, { where: { id: order.id, status: 'pending' } });
-      if (affectedRows === 0) throw new Error('订单状态已变更，无法取消');
-      await amountService.releaseLock(order.walletAddress, order.actualAmount);
+      const r = await order.cancelPendingById(orderId);
+      if (!r.order) throw new Error('订单不存在');
+      if (r.order.status !== 'pending') throw new Error('只能取消待支付订单');
+      if (r.affected === 0) throw new Error('订单状态已变更，无法取消');
+      await amountService.releaseLock(r.order.walletAddress, r.order.actualAmount);
     },
     async processExpiredOrders(): Promise<void> {
-      const expiredOrders = await PaymentOrder.findAll({
-        where: { status: 'pending', expiresAt: { [Op.lt]: new Date() } },
-      });
-      for (const order of expiredOrders) {
-        await order.update({ status: 'expired' });
-        await amountService.releaseLock(order.walletAddress, order.actualAmount);
+      const expiredOrders = await order.findPendingExpiredBefore(new Date());
+      for (const o of expiredOrders) {
+        await order.updateById(o.id, { status: 'expired' });
+        await amountService.releaseLock(o.walletAddress, o.actualAmount);
       }
     },
-    isOrderExpired(order: any): boolean {
+    isOrderExpired(order: { expiresAt: Date }): boolean {
       return new Date() > order.expiresAt;
     },
     amountService,

@@ -1,7 +1,7 @@
 /**
  * 宿主服务端调用支付接口示例
  *
- * @author Telegram @Mhuai8
+ * @author Telegram @okgeceo
  */
 
 import crypto from 'crypto';

@@ -1,7 +1,7 @@
 /**
  * API 统一响应工具
  *
- * @author Telegram @Mhuai8
+ * @author Telegram @okgeceo
  */
 
 import type { Response } from 'express';

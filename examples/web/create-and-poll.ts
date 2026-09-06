@@ -1,7 +1,7 @@
 /**
  * 网页端：创建订单并轮询状态示例
  *
- * @author Telegram @Mhuai8
+ * @author Telegram @okgeceo
  */
 
 import crypto from 'crypto';
