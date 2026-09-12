@@ -1,3 +1,4 @@
-tarball=obeliskstudio-obelisk-usdt-0.2.0.tgz
-sha256=7004aac8e6a0ec1955c30cd66d3ffc61af744457800e97edebda275abeaeffcf
-packed_at=2026-04-15 16:13:04 +0800
+tarball=obeliskstudio-obelisk-usdt-0.2.3.tgz
+sha256=b4e522447c407e560aed0d00009f40f65fe84cb4a5001e2bb5db24d625176700
+packed_at=2026-09-12 16:28:46 +0800
+version=0.2.3
