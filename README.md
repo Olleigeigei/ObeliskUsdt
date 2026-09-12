@@ -326,7 +326,8 @@ await bot.sendPhoto(chatId, result.qrPngBuffer, {
 - 查询/取消接口必须校验订单归属
 - `onOrderConfirmed` 发放逻辑必须幂等
 - 密钥必须使用环境变量，禁止硬编码
-- 扫描器对第三方链上接口启用短熔断降频，避免外部抖动拖垮主流程
+- 扫描器优先使用 TronGrid；成功返回合法交易数组时（包括空数组）不会访问 Tronscan，仅在请求失败或响应无效时回退。
+- TronGrid 与 Tronscan 分别使用各自 API Key，并对第三方链上接口启用短熔断降频，避免外部抖动拖垮主流程。
 
 ## 性能与稳定性优化
 
