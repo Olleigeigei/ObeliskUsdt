@@ -1,6 +1,6 @@
 {
   "name": "@obeliskstudio/obelisk-usdt",
-  "version": "0.2.1",
+  "version": "0.2.3",
   "description": "ObeliskStudio 通用 USDT-TRC20 支付模块",
   "main": "dist/src/index.js",
   "files": [
@@ -16,14 +16,17 @@
     "release:pack": "sh ./scripts/release-pack.sh"
   },
   "dependencies": {
-    "axios": "^1.12.2",
+    "axios": "^1.20.0",
     "decimal.js": "^10.6.0",
     "express": "^5.2.1",
     "ioredis": "^5.9.3",
     "qrcode": "^1.5.4",
-    "sequelize": "^6.37.7",
-    "sharp": "^0.34.4",
-    "tronweb": "^6.0.4"
+    "sequelize": "^6.37.8",
+    "sharp": "^0.35.4",
+    "tronweb": "^6.5.0"
+  },
+  "overrides": {
+    "uuid": "11.1.1"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
@@ -31,7 +34,7 @@
     "@types/node": "^25.3.0",
     "@types/qrcode": "^1.5.6",
     "jest": "^30.2.0",
-    "sqlite3": "^5.1.7",
+    "sqlite3": "^6.0.1",
     "ts-jest": "^29.4.6",
     "typescript": "^5.9.3"
   }

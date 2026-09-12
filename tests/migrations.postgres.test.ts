@@ -4,12 +4,15 @@
  * @author Telegram @okgeceo
  */
 
-import { Sequelize } from 'sequelize';
+import { DataTypes, Sequelize, Utils } from 'sequelize';
 import {
   resolveMigrationDialect,
   resolveMigrationDir,
   runObeliskUSDTMigrations,
 } from '../src/migrations/runMigrations';
+
+const UUID_V1_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-1[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 describe('runObeliskUSDTMigrations', () => {
   let sequelize: Sequelize;
@@ -52,6 +55,22 @@ describe('runObeliskUSDTMigrations', () => {
     const second = await runObeliskUSDTMigrations({ sequelize });
     expect(second.executed.length).toBe(0);
     expect(second.skipped.length).toBe(4);
+  });
+});
+
+describe('Sequelize uuid 11 compatibility', () => {
+  it('uses the audited uuid release selected by the root override', () => {
+    const uuidPackage = require('uuid/package.json') as { version: string };
+
+    expect(uuidPackage.version).toBe('11.1.1');
+  });
+
+  it('generates UUID v1 and v4 default values through Sequelize', () => {
+    const uuidV1 = Utils.toDefaultValue(new DataTypes.UUIDV1());
+    const uuidV4 = Utils.toDefaultValue(new DataTypes.UUIDV4());
+
+    expect(uuidV1).toMatch(UUID_V1_PATTERN);
+    expect(uuidV4).toMatch(UUID_V4_PATTERN);
   });
 });
 
