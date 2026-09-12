@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 152" role="img" aria-label="ObeliskUSDT">
+  <defs>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="#009393"/>
+      <stop offset="1" stop-color="#10B981"/>
+    </linearGradient>
+  </defs>
+  <rect width="720" height="152" fill="#FFFFFF"/>
+  <g transform="translate(12, 0)">
+    <g transform="translate(0, 8) scale(0.17)">
+      <circle fill="#009393" cx="400" cy="400" r="400"/>
+      <path fill="#ffffff" fill-rule="evenodd" d="M400.49,428.59c68.79,0,126.28-11.63,140.33-27.17-11.93-13.18-55.08-23.56-109.88-26.4v32.83c-9.81.51-20.01.76-30.46.76s-20.65-.25-30.48-.76v-32.83c-54.78,2.84-97.95,13.22-109.88,26.4,14.07,15.54,71.57,27.17,140.36,27.17ZM522.71,274.06v45.21h-91.77v31.35c64.46,3.35,112.83,17.13,113.19,33.62v34.38c-.36,16.49-48.73,30.24-113.19,33.6v76.94h-60.93v-76.94c-64.46-3.35-112.81-17.11-113.17-33.6v-34.38c.36-16.49,48.71-30.27,113.17-33.62v-31.35h-91.77v-45.21h244.48ZM242.15,202.11h322.16c7.7,0,14.79,4.05,18.63,10.63l93.85,161.16c4.86,8.36,3.42,18.91-3.52,25.68l-258.34,252.18c-8.38,8.17-21.84,8.17-30.2,0L126.71,399.92c-7.09-6.94-8.43-17.79-3.2-26.19l100.33-161.49c3.91-6.28,10.85-10.12,18.32-10.12Z"/>
+    </g>
+    <g fill="#0F172A">
+      <rect x="152" y="30" width="13" height="92" rx="2"/>
+      <polygon points="165,30 226,30 226,46 172,74 165,74"/>
+      <polygon points="165,74 172,74 226,116 226,122 165,122"/>
+    </g>
+  </g>
+  <line x1="238" y1="28" x2="238" y2="124" stroke="#E2E8F0" stroke-width="1.5"/>
+  <text x="258" y="44" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="700" fill="#94A3B8">OBELISK STUDIO</text>
+  <text x="258" y="88" font-family="Arial, Helvetica, sans-serif" font-size="44" font-weight="700" fill="#0B1220">
+    <tspan>Obelisk</tspan><tspan fill="#009393">USDT</tspan>
+  </text>
+  <text x="258" y="112" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#475569">USDT-TRC20 payment module</text>
+  <rect x="258" y="120" width="120" height="3" rx="1.5" fill="url(#accent)"/>
+  <text x="258" y="138" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="400" fill="#64748B">Self-hosted | Web and Bot</text>
+</svg>

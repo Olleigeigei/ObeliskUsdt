@@ -8,7 +8,8 @@
     "database/migrations/**",
     "README.md",
     "CHANGELOG.md",
-    "docs/使用说明-接入文档.md"
+    "docs/使用说明-接入文档.md",
+    "assets/**"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
