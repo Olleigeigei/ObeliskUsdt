@@ -356,7 +356,7 @@ await bot.sendPhoto(chatId, result.qrPngBuffer, {
 
 - Copyright © 2026 ObeliskStudio. All rights reserved.
 - 维护者：`@okgeceo`（ObeliskStudio）
-- 作者邮箱：`aniwaawa@gmail.com` / `mhuai8@outlook.com`
+- 作者邮箱：`okgeceo@gmail.com`
 - 工作室 Telegram：`@ObeliskStudio`
 - 工作室业务：承接定制开发、支付系统、机器人、网站与各类技术外包合作
 - 业务合作：需要定制或开发，联系 `@okgeceo`
