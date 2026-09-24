@@ -9,9 +9,9 @@
 
 <br />
 
-### 可嵌入的 USDT-TRC20 支付模块
+### Embeddable USDT-TRC20 payment module
 
-*自托管支付链路，支持网站与 Telegram 机器人，资金直达你的收款钱包。*
+*Self-hosted payment pipeline for web and Telegram — funds go to your wallets.*
 
 <br />
 
@@ -29,49 +29,49 @@
 
 ---
 
-## 目录
+## Table of contents
 
-- [概览](#overview)
-- [技术栈](#tech-stack)
-- [架构一览](#architecture)
-- [职责边界](#scope)
-- [核心特性](#features)
-- [快速开始](#quick-start)
-- [支付时序](#payment-flow)
-- [订单状态](#order-lifecycle)
-- [HTTP 接口](#http-api)
-- [环境变量](#environment)
-- [创建订单与签名](#create-and-sign)
-- [安全与稳定性](#security-and-reliability)
-- [示例与文档](#examples-and-docs)
-- [上线检查](#pre-launch)
-- [许可与联系](#license-and-contact)
+- [Overview](#overview)
+- [Tech stack](#tech-stack)
+- [Architecture](#architecture)
+- [Scope](#scope)
+- [Features](#features)
+- [Quick start](#quick-start)
+- [Payment flow](#payment-flow)
+- [Order lifecycle](#order-lifecycle)
+- [HTTP API](#http-api)
+- [Environment](#environment)
+- [Create order & signing](#create-and-sign)
+- [Security & reliability](#security-and-reliability)
+- [Examples & docs](#examples-and-docs)
+- [Pre-launch checklist](#pre-launch)
+- [License & contact](#license-and-contact)
 
-> 英文说明见 **[README.en.md](README.en.md)**
+> Full integration guide (Chinese): **[docs/使用说明-接入文档.md](docs/使用说明-接入文档.md)** · Simplified Chinese README: **[README.md](README.md)**
 
 ---
 
 <a id="overview"></a>
 
-## 概览
+## Overview
 
-`ObeliskUSDT` 专注 **USDT-TRC20** 收款：下单、二维码、扫链确认、`onOrderConfirmed` 回调。  
-**不是商城系统**，而是可嵌入宿主项目的支付模块；商品、定价、会员发放由宿主负责。
+**ObeliskUSDT** is a **USDT-TRC20** payment module: create orders, QR codes, on-chain scanning, and `onOrderConfirmed` callbacks.  
+It is **not** a storefront — it embeds into your app; catalog, pricing, and entitlements stay in the host.
 
-| 维度 | 说明 |
+| | |
 |------|------|
-| 目标 | 低改造、快接入、支付与业务解耦 |
-| 适用 | 网站、Telegram 机器人、SaaS、订阅与工具付费 |
-| 对账 | `bizOrderNo` 透传，区分业务单号与支付 `orderNo` |
-| 部署 | 私有化自托管，资金直达你的收款钱包 |
+| Goal | Low-friction integration; payment decoupled from business logic |
+| Use cases | Websites, Telegram bots, SaaS, subscriptions, paid tools |
+| Reconciliation | Pass through `bizOrderNo`; payment `orderNo` is separate |
+| Deployment | Self-hosted; funds land in **your** wallets |
 
-npm 包为编译后的 **JavaScript**，不含 `.d.ts`；TypeScript 宿主可自行 `declare module '@obeliskstudio/obelisk-usdt'`。
+The npm package ships compiled **JavaScript** without `.d.ts`. TypeScript hosts can add `declare module '@obeliskstudio/obelisk-usdt'`.
 
 ---
 
 <a id="tech-stack"></a>
 
-## 技术栈
+## Tech stack
 
 <div align="center">
 
@@ -87,13 +87,13 @@ npm 包为编译后的 **JavaScript**，不含 `.d.ts`；TypeScript 宿主可自
 
 </div>
 
-数据访问二选一：`sequelize`（内置实现）或自定义 `persistence`（`ObeliskPersistence`，如 Prisma）。
+Persistence: either pass **`sequelize`** (built-in) or a custom **`persistence`** implementing `ObeliskPersistence` (e.g. Prisma).
 
 ---
 
 <a id="architecture"></a>
 
-## 架构一览
+## Architecture
 
 ```mermaid
 flowchart LR
@@ -126,70 +126,70 @@ flowchart LR
 
 <a id="scope"></a>
 
-## 职责边界
+## Scope
 
-| 本模块负责 | 宿主项目负责 |
-|------------|--------------|
-| 生成支付订单与实付金额 | 商品、定价、库存等业务规则 |
-| 分配收款钱包与支付二维码 | 权益发放（**必须幂等**） |
-| 扫链匹配、更新支付状态 | 用户系统与权限体系 |
-| 触发 `onOrderConfirmed` | 财务对账与内部报表 |
+| Module | Host app |
+|--------|----------|
+| Payment orders and payable amounts | Products, pricing, inventory |
+| Wallet assignment and QR codes | Entitlements (**must be idempotent**) |
+| Chain matching and status updates | Users and authorization |
+| `onOrderConfirmed` callback | Finance and internal reporting |
 
-核心表前缀 **`obl_`**：`obl_payment_wallets`、`obl_payment_orders`、`obl_payment_transactions`。
+Tables use prefix **`obl_`**: `obl_payment_wallets`, `obl_payment_orders`, `obl_payment_transactions`.
 
 ---
 
 <a id="features"></a>
 
-## 核心特性
+## Features
 
-| | 能力 |
+| | |
 |---|------|
-| ![API](https://img.shields.io/badge/API-First-007EC6?style=flat-square) | HTTP 路由接入，不绑定业务框架 |
-| ![Self-hosted](https://img.shields.io/badge/Self--hosted-Audit-555?style=flat-square) | 部署在你自己的环境，链路可审计 |
-| ![Web+Bot](https://img.shields.io/badge/Web_%2B_Bot-Shared-5865F2?style=flat-square) | 网页与机器人共用一套支付核心 |
-| ![Hash](https://img.shields.io/badge/Tx-Dedup-2EA043?style=flat-square) | 交易哈希去重，避免重复入账 |
-| ![Token](https://img.shields.io/badge/orderToken-Ownership-8957E5?style=flat-square) | 查询/取消校验订单归属 |
-| ![Sign](https://img.shields.io/badge/HMAC-Anti_abuse-CB3837?style=flat-square) | 创建订单签名 + `ts`/`nonce` 防重放 |
+| ![API](https://img.shields.io/badge/API-First-007EC6?style=flat-square) | HTTP routes; no framework lock-in |
+| ![Self-hosted](https://img.shields.io/badge/Self--hosted-Audit-555?style=flat-square) | Deploy on your infra; auditable flow |
+| ![Web+Bot](https://img.shields.io/badge/Web_%2B_Bot-Shared-5865F2?style=flat-square) | One core for web and bot |
+| ![Hash](https://img.shields.io/badge/Tx-Dedup-2EA043?style=flat-square) | Tx hash dedup |
+| ![Token](https://img.shields.io/badge/orderToken-Ownership-8957E5?style=flat-square) | Status/cancel scoped by `orderToken` |
+| ![Sign](https://img.shields.io/badge/HMAC-Anti_abuse-CB3837?style=flat-square) | HMAC on create + `ts`/`nonce` anti-replay |
 
 ---
 
 <a id="quick-start"></a>
 
-## 快速开始
+## Quick start
 
-### 安装
+### Install
 
 ```bash
 npm i @obeliskstudio/obelisk-usdt@latest
 npm ls @obeliskstudio/obelisk-usdt
 ```
 
-### 5 分钟清单
+### Checklist
 
-- [ ] 执行数据库迁移（推荐 `runObeliskUSDTMigrations`）
-- [ ] `initObeliskUSDT(...)` 并挂载 `paymentRouter` / `adminRouter`
+- [ ] Run DB migrations (`runObeliskUSDTMigrations`)
+- [ ] `initObeliskUSDT(...)` and mount `paymentRouter` / `adminRouter`
 - [ ] `startScanner()` + `registerScheduledTasks(cron)`
-- [ ] 实现幂等 `onOrderConfirmed`
-- [ ] 管理端先添加 **至少 2 个** 收款钱包再开放支付
+- [ ] Idempotent `onOrderConfirmed`
+- [ ] Add **at least 2** receiving wallets in admin before going live
 
-### 迁移
+### Migrations
 
 ```ts
 import { runObeliskUSDTMigrations, initObeliskUSDT } from '@obeliskstudio/obelisk-usdt';
 
 await runObeliskUSDTMigrations({ sequelize, logger });
-// 或 runObeliskUSDTMigrations({ query: myQueryFn, logger });  // 与 sequelize 二选一
+// or runObeliskUSDTMigrations({ query: myQueryFn, logger });
 ```
 
-- 迁移记录表：`obl_usdt_schema_migrations`；已执行脚本自动跳过  
-- **`initObeliskUSDT` 不会自动改库**，需在部署阶段主动跑迁移
+- Migration table: `obl_usdt_schema_migrations`; applied scripts are skipped  
+- **`initObeliskUSDT` does not migrate** — run migrations in your deploy step
 
-### 初始化
+### Initialize
 
 ```ts
 const usdt = initObeliskUSDT({
-  sequelize, // 或 persistence: createPrismaObeliskPersistence(prisma)
+  sequelize, // or persistence: createPrismaObeliskPersistence(prisma)
   redis,
   logger,
   config: {
@@ -206,7 +206,7 @@ const usdt = initObeliskUSDT({
     admin: requireAdminAuth,
   },
   onOrderConfirmed: async (order) => {
-    await benefitService.grantByOrderNo(order.orderNo); // 必须幂等
+    await benefitService.grantByOrderNo(order.orderNo); // idempotent
   },
 });
 
@@ -220,7 +220,7 @@ usdt.registerScheduledTasks(cron);
 
 <a id="payment-flow"></a>
 
-## 支付时序
+## Payment flow
 
 ```mermaid
 sequenceDiagram
@@ -244,7 +244,7 @@ sequenceDiagram
 
 <a id="order-lifecycle"></a>
 
-## 订单状态
+## Order lifecycle
 
 ```mermaid
 stateDiagram-v2
@@ -255,61 +255,61 @@ stateDiagram-v2
   pending --> cancelled: user cancel or timeout
 ```
 
-| 状态 | 含义 |
-|------|------|
-| `pending` | 待支付 |
-| `paid` | 链上已匹配 |
-| `confirmed` | 确认数达标 |
-| `completed` | 回调处理完成 |
+| Status | Meaning |
+|--------|---------|
+| `pending` | Awaiting payment |
+| `paid` | Matched on chain |
+| `confirmed` | Confirmations OK |
+| `completed` | Callback finished |
 
 ---
 
 <a id="http-api"></a>
 
-## HTTP 接口
+## HTTP API
 
-### 用户接口
+### User routes
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| `POST` | `/payment/create` | 创建订单；需 HMAC 签名 |
-| `GET` | `/payment/status/:orderNo` | 查询状态；需 `orderToken` |
-| `POST` | `/payment/cancel/:orderNo` | 取消订单；需 `orderToken` |
+| Method | Path | Notes |
+|--------|------|-------|
+| `POST` | `/payment/create` | HMAC signature required |
+| `GET` | `/payment/status/:orderNo` | Requires `orderToken` |
+| `POST` | `/payment/cancel/:orderNo` | Requires `orderToken` |
 
-`orderToken`：Header `x-obl-order-token` 或 Query `?token=`
+`orderToken`: header `x-obl-order-token` or query `?token=`
 
-### 管理接口
+### Admin routes
 
-| 前缀 | 说明 |
-|------|------|
-| `/admin/payment/wallets/*` | 收款钱包 CRUD |
-| `/admin/payment/orders/*` | 订单管理 |
-| `/admin/payment/network*` | 网络与扫描相关配置 |
-| `GET /admin/payment/stats` | 扫描器健康（熔断、队列） |
+| Prefix | Notes |
+|--------|-------|
+| `/admin/payment/wallets/*` | Wallet CRUD |
+| `/admin/payment/orders/*` | Order management |
+| `/admin/payment/network*` | Network / scanner config |
+| `GET /admin/payment/stats` | Scanner health (circuit breaker, queue) |
 
 ---
 
 <a id="environment"></a>
 
-## 环境变量
+## Environment
 
-| 变量 | 用途 |
-|------|------|
-| `TRONGRID_API_KEY` | TronGrid 链上查询（主数据源） |
-| `TRONSCAN_API_KEY` | Tronscan 回退查询（独立 Key） |
-| `OBL_USDT_API_AUTH_TOKEN` | 创建订单 HMAC 密钥 |
-| `WEB_URL` | 支付页/回调相关 Web 基址 |
-| `BOT_USERNAME` | 机器人用户名（机器人场景） |
+| Variable | Purpose |
+|----------|---------|
+| `TRONGRID_API_KEY` | TronGrid (primary) |
+| `TRONSCAN_API_KEY` | Tronscan fallback (separate key) |
+| `OBL_USDT_API_AUTH_TOKEN` | HMAC secret for create |
+| `WEB_URL` | Web base URL |
+| `BOT_USERNAME` | Bot username (bot scenarios) |
 
-密钥禁止硬编码；查询/取消必须校验订单归属。
+Never hardcode secrets. Status/cancel must verify order ownership.
 
 ---
 
 <a id="create-and-sign"></a>
 
-## 创建订单与签名
+## Create order & signing
 
-### 请求体示例
+### Request body
 
 ```json
 {
@@ -322,28 +322,28 @@ stateDiagram-v2
 }
 ```
 
-### 字段说明
+### Fields
 
-| 字段 | 必填 | 说明 |
-|------|------|------|
-| `bizOrderNo` | 是 | 宿主业务订单号；支付中且未过期时幂等返回同一笔 |
-| `baseAmount` | 是 | 基准金额，> 0，最多 2 位小数，建议字符串 |
-| `ts` | 是 | 时间戳（秒或毫秒）；默认窗口 300s，可配 `apiSignMaxSkewSeconds` |
-| `nonce` | 是 | 随机串；Redis `SET NX` 按 `bizOrderNo+nonce` 防重放 |
-| `metadata` | 否 | 透传字段，参与签名（稳定 JSON 序列化） |
-| `signature` | 是 | HMAC-SHA256，`apiAuthToken` 为密钥，hex 小写 |
+| Field | Required | Notes |
+|-------|----------|-------|
+| `bizOrderNo` | yes | Host order id; idempotent while pending and not expired |
+| `baseAmount` | yes | > 0, max 2 decimals, string recommended |
+| `ts` | yes | Seconds or ms; default skew 300s (`apiSignMaxSkewSeconds`) |
+| `nonce` | yes | Redis `SET NX` per `bizOrderNo+nonce` |
+| `metadata` | no | Included in signature (stable JSON) |
+| `signature` | yes | HMAC-SHA256 hex lowercase |
 
-### 签名步骤摘要
+### Signing (summary)
 
-1. 参与字段：`bizOrderNo`、`baseAmount`、`ts`、`nonce`、`metadata`（空则跳过）  
-2. 按 key ASCII 排序，拼接 `key=encodeURIComponent(value)&...`  
-3. `metadata` 先 `stableStringify` 再参与拼接  
-4. HMAC-SHA256；比较使用 `timingSafeEqual`
+1. Fields: `bizOrderNo`, `baseAmount`, `ts`, `nonce`, `metadata` (skip if empty)  
+2. Sort keys ASCII; join `key=encodeURIComponent(value)&...`  
+3. `stableStringify` metadata before encoding  
+4. HMAC-SHA256; compare with `timingSafeEqual`
 
-完整说明与错误场景见 **[docs/使用说明-接入文档.md](docs/使用说明-接入文档.md)** §6、§6.1。
+Details: **[docs/使用说明-接入文档.md](docs/使用说明-接入文档.md)** §6, §6.1 (Chinese).
 
 <details>
-<summary><strong>Node.js 签名示例（点击展开）</strong></summary>
+<summary><strong>Node.js signing example</strong></summary>
 
 ```ts
 import crypto from 'crypto';
@@ -385,57 +385,57 @@ export function buildSignature(payload: any, apiAuthToken: string) {
 
 </details>
 
-### 网页与机器人
+### Web & bot
 
-- **Web**：展示二维码与倒计时，轮询 `GET /payment/status/:orderNo`  
-- **Bot**：`usdt.bot.createOrderWithQR({ bizOrderNo, baseAmount, metadata })` 发送 `qrPngBuffer`
+- **Web**: show QR and countdown; poll `GET /payment/status/:orderNo`  
+- **Bot**: `usdt.bot.createOrderWithQR({ bizOrderNo, baseAmount, metadata })` → `qrPngBuffer`
 
 ---
 
 <a id="security-and-reliability"></a>
 
-## 安全与稳定性
+## Security & reliability
 
-| 主题 | 说明 |
-|------|------|
-| 链上数据源 | TronGrid 为主；**合法数组（含空）即结束**，仅失败或结构无效时回退 Tronscan |
-| API Key | TronGrid / Tronscan **各自独立 Key** |
-| 熔断降频 | 第三方接口失败时短熔断与退避，避免拖垮扫描主流程 |
-| 扫描性能 | 钱包并发池、配置短缓存、无交易时降频 |
-| 回调 | 确认后异步队列（重试 + 死信），慢回调不阻塞扫链 |
+| Topic | Notes |
+|-------|-------|
+| Chain data | TronGrid first; **valid array (even empty) stops**; Tronscan only on failure/invalid body |
+| API keys | Separate keys for TronGrid and Tronscan |
+| Circuit breaker | Short backoff on upstream failures |
+| Scanner | Wallet pool, config cache, slower polling when idle |
+| Callbacks | Async queue after confirm (retry + DLQ) |
 
 ---
 
 <a id="examples-and-docs"></a>
 
-## 示例与文档
+## Examples & docs
 
-| 路径 | 说明 |
-|------|------|
-| [examples/backend/host-init.ts](examples/backend/host-init.ts) | 宿主初始化与路由挂载 |
-| [examples/backend/prisma-persistence.example.ts](examples/backend/prisma-persistence.example.ts) | Prisma `ObeliskPersistence` |
-| [examples/backend/payment-api-client.ts](examples/backend/payment-api-client.ts) | 创建/查询/取消 |
-| [examples/web/create-and-poll.ts](examples/web/create-and-poll.ts) | 网页轮询状态 |
-| [examples/bot/create-order-with-qr.ts](examples/bot/create-order-with-qr.ts) | 机器人二维码下单 |
-| [docs/使用说明-接入文档.md](docs/使用说明-接入文档.md) | **完整接入**（含加钱包流程 §13） |
+| Path | Notes |
+|------|-------|
+| [examples/backend/host-init.ts](examples/backend/host-init.ts) | Host init and routes |
+| [examples/backend/prisma-persistence.example.ts](examples/backend/prisma-persistence.example.ts) | Prisma persistence |
+| [examples/backend/payment-api-client.ts](examples/backend/payment-api-client.ts) | Create / query / cancel |
+| [examples/web/create-and-poll.ts](examples/web/create-and-poll.ts) | Web polling |
+| [examples/bot/create-order-with-qr.ts](examples/bot/create-order-with-qr.ts) | Bot QR order |
+| [docs/使用说明-接入文档.md](docs/使用说明-接入文档.md) | Full integration (Chinese) |
 
 ---
 
 <a id="pre-launch"></a>
 
-## 上线检查
+## Pre-launch checklist
 
-- [ ] ≥ 2 个可用收款钱包  
-- [ ] `onOrderConfirmed` 幂等  
-- [ ] 扫描器与定时任务已启动、可观测  
-- [ ] `.env` 已配置 TronGrid / Tronscan / `apiAuthToken`  
-- [ ] 对外查询/取消携带 `orderToken`  
+- [ ] ≥ 2 active receiving wallets  
+- [ ] Idempotent `onOrderConfirmed`  
+- [ ] Scanner and cron running and observable  
+- [ ] `.env`: TronGrid, Tronscan, `apiAuthToken`  
+- [ ] Status/cancel always use `orderToken`  
 
 ---
 
 <a id="license-and-contact"></a>
 
-## 许可与联系
+## License & contact
 
 <div align="center">
 
@@ -446,6 +446,6 @@ export function buildSignature(payload: any, apiAuthToken: string) {
 
 Copyright © 2026 ObeliskStudio. All rights reserved.
 
-- 维护者：`@okgeceo`（ObeliskStudio）· 工作室 TG：`@ObeliskStudio`  
-- 邮箱：`okgeceo@gmail.com`  
-- 定制开发、支付系统、机器人与网站外包：联系 **`@okgeceo`**
+- Maintainer: `@okgeceo` (ObeliskStudio) · Studio TG: `@ObeliskStudio`  
+- Email: `okgeceo@gmail.com`  
+- Custom payments, bots, and web work: **`@okgeceo`**

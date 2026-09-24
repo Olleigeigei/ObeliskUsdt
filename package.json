@@ -7,6 +7,7 @@
     "dist/**",
     "database/migrations/**",
     "README.md",
+    "README.en.md",
     "CHANGELOG.md",
     "docs/使用说明-接入文档.md",
     "assets/**"
