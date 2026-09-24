@@ -1,0 +1,29 @@
+# dependency
+node_modules/
+
+# build output
+dist/
+coverage/
+
+# local env
+.env
+.env.*
+
+# IDE / cursor
+.cursor/
+
+# tests and test configs
+tests/*
+!tests/blockScanner.test.ts
+!tests/qrImage.test.ts
+jest.config.cjs
+tsconfig.test.json
+
+# extra docs (keep root README and one public guide)
+docs/*
+!docs/使用说明-接入文档.md
+package/obeliskusdt/RELEASE_INFO.txt
+
+# reference archives (never commit)
+epusdt-master.zip
+*.zip
